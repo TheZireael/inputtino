@@ -270,14 +270,32 @@ static uint16_t to_le_signed(int value) {
   return htole16(value);
 }
 
-void Ultimate2Joypad::set_motion(MOTION_TYPE type, float x, float y, float z) {
-  uint16_t values[3] = {to_le_signed(std::lround(x)), to_le_signed(std::lround(y)), to_le_signed(std::lround(z))};
-  if (type == GYROSCOPE) {
-    std::memcpy(&_state->current_state.vendor[4], values, sizeof(values));
-  } else if (type == ACCELERATION) {
-    std::memcpy(&_state->current_state.vendor[10], values, sizeof(values));
-  }
-  send_report(*this->_state);
+static inline int16_t clamp_i16(long v) {
+  if (v < SHRT_MIN) return SHRT_MIN;
+  if (v > SHRT_MAX) return SHRT_MAX;
+  return (int16_t)v;
 }
+
+void Ultimate2Joypad::set_motion(MOTION_TYPE type, float x, float y, float z) {
+  int16_t v[3];
+
+  if (type == GYROSCOPE) {
+    // x,y,z are deg/s from Moonlight
+    v[0] = clamp_i16(lroundf(x * 16.0f));
+    v[1] = clamp_i16(lroundf(y * 16.0f));
+    v[2] = clamp_i16(lroundf(z * 16.0f));
+    std::memcpy(&_state->current_state.vendor[4], v, sizeof(v));
+  } else {
+    // x,y,z are m/s^2 from Moonlight
+    constexpr float g = 9.80665f;
+    v[0] = clamp_i16(lroundf((x / g) * 4096.0f));
+    v[1] = clamp_i16(lroundf((y / g) * 4096.0f));
+    v[2] = clamp_i16(lroundf((z / g) * 4096.0f));
+    std::memcpy(&_state->current_state.vendor[10], v, sizeof(v));
+  }
+
+  send_report(*_state);
+}
+
 
 } // namespace inputtino
