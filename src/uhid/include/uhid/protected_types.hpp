@@ -4,6 +4,7 @@
 #include <optional>
 #include <uhid/ps5.hpp>
 #include <uhid/uhid.hpp>
+#include <uhid/ultimate2.hpp>
 
 namespace inputtino {
 struct PS5JoypadState {
@@ -32,5 +33,16 @@ struct PS5JoypadState {
 
   bool stop_repeat_thread = false;
   bool is_bluetooth = true;
+};
+
+struct Ultimate2JoypadState {
+  std::shared_ptr<uhid::Device> dev;
+  uint16_t vendor_id;
+  uint16_t product_id;
+  std::string uniq;
+
+  uhid::ultimate2_input_report current_state = {};
+
+  std::optional<std::function<void(int, int)>> on_rumble = std::nullopt;
 };
 } // namespace inputtino
