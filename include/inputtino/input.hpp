@@ -463,4 +463,40 @@ private:
 
   PS5Joypad(uint16_t vendor_id, std::array<unsigned char, 6> mac_address = generate_mac_address());
 };
+
+class Ultimate2Joypad : public Joypad {
+public:
+  static Result<Ultimate2Joypad>
+  create(const DeviceDefinition &device = {.name = "8BitDo Ultimate 2 (virtual) pad",
+                                           .vendor_id = 0x2DC8,
+                                           .product_id = 0x6012,
+                                           .version = 0x0100});
+  Ultimate2Joypad(Ultimate2Joypad &&j) noexcept : _state(nullptr) {
+    std::swap(j._state, _state);
+  }
+  ~Ultimate2Joypad() override;
+
+  std::vector<std::string> get_nodes() const override;
+  std::vector<std::string> get_sys_nodes() const;
+
+  void set_pressed_buttons(unsigned int newly_pressed) override;
+  void set_triggers(int16_t left, int16_t right) override;
+  void set_stick(STICK_POSITION stick_type, short x, short y) override;
+  void set_on_rumble(const std::function<void(int low_freq, int high_freq)> &callback);
+
+  enum MOTION_TYPE : uint8_t {
+    ACCELERATION = 0x01,
+    GYROSCOPE = 0x02
+  };
+
+  void set_motion(MOTION_TYPE type, float x, float y, float z);
+  void set_battery(uint8_t level);
+
+protected:
+  typedef struct Ultimate2JoypadState Ultimate2JoypadState;
+  std::shared_ptr<Ultimate2JoypadState> _state;
+
+private:
+  Ultimate2Joypad(uint16_t vendor_id, uint16_t product_id, std::string uniq);
+};
 } // namespace inputtino

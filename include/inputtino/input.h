@@ -317,6 +317,42 @@ LIBINPUTTINO_EXPORT void inputtino_joypad_ps5_set_on_trigger_effect(InputtinoPS5
 
 LIBINPUTTINO_EXPORT void inputtino_joypad_ps5_destroy(InputtinoPS5Joypad *joypad);
 
+/*
+ * 8BitDo Ultimate 2 Joypad
+ */
+
+struct InputtinoUltimate2Joypad;
+typedef struct InputtinoUltimate2Joypad InputtinoUltimate2Joypad;
+
+LIBINPUTTINO_EXPORT InputtinoUltimate2Joypad *inputtino_joypad_ultimate2_create(const InputtinoDeviceDefinition *device,
+                                                                   const InputtinoErrorHandler *eh);
+
+LIBINPUTTINO_EXPORT char **inputtino_joypad_ultimate2_get_nodes(InputtinoUltimate2Joypad *joypad, int *num_nodes);
+
+LIBINPUTTINO_EXPORT void inputtino_joypad_ultimate2_set_pressed_buttons(InputtinoUltimate2Joypad *joypad, int newly_pressed);
+
+LIBINPUTTINO_EXPORT void
+inputtino_joypad_ultimate2_set_triggers(InputtinoUltimate2Joypad *joypad, short left_trigger, short right_trigger);
+
+LIBINPUTTINO_EXPORT void inputtino_joypad_ultimate2_set_stick(InputtinoUltimate2Joypad *joypad,
+                                                  enum INPUTTINO_JOYPAD_STICK_POSITION stick_type,
+                                                  short x,
+                                                  short y);
+
+LIBINPUTTINO_EXPORT void
+inputtino_joypad_ultimate2_set_on_rumble(InputtinoUltimate2Joypad *joypad, InputtinoJoypadRumbleFn rumble_fn, void *user_data);
+
+LIBINPUTTINO_EXPORT void
+inputtino_joypad_ultimate2_set_motion(InputtinoUltimate2Joypad *joypad,
+                                      enum INPUTTINO_JOYPAD_MOTION_TYPE motion_type,
+                                      float x,
+                                      float y,
+                                      float z);
+
+LIBINPUTTINO_EXPORT void inputtino_joypad_ultimate2_set_battery(InputtinoUltimate2Joypad *joypad, unsigned short level);
+
+LIBINPUTTINO_EXPORT void inputtino_joypad_ultimate2_destroy(InputtinoUltimate2Joypad *joypad);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

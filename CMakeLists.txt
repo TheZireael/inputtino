@@ -119,7 +119,7 @@ if (UNIX AND NOT APPLE)
 
     if (USE_UHID)
         message("Using uhid implementation for DualSense controller")
-        list(APPEND SRC_LIST "src/uhid/joypad_ps5.cpp")
+        list(APPEND SRC_LIST "src/uhid/joypad_ps5.cpp" "src/uhid/joypad_ultimate2.cpp")
         target_include_directories(libinputtino PUBLIC "src/uhid/include/")
     else ()
         message("Using uinput implementation for DualSense controller")
