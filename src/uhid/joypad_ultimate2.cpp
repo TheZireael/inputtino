@@ -25,43 +25,31 @@ static void send_report(Ultimate2JoypadState &state) {
 }
 
 static void on_uhid_event(std::shared_ptr<Ultimate2JoypadState> state, uhid_event ev, int fd) {
+  (void)fd;
   switch (ev.type) {
 
-  case UHID_GET_REPORT: {
-    uhid_event answer{};
-    answer.type = UHID_GET_REPORT_REPLY;
-    answer.u.get_report_reply.id = ev.u.get_report.id;
-    answer.u.get_report_reply.err = 0;
-
-    // Minimal reply: just echo requested report number as first byte
-    // (You can expand later once you know what Steam requests)
-    answer.u.get_report_reply.data[0] = ev.u.get_report.rnum;
-    answer.u.get_report_reply.size = 1;
-
-    uhid::uhid_write(fd, &answer);
-    break;
-  }
-
-  case UHID_SET_REPORT: {
-    uhid_event answer{};
-    answer.type = UHID_SET_REPORT_REPLY;
-    answer.u.set_report_reply.id = ev.u.set_report.id;
-    answer.u.set_report_reply.err = 0;
-    uhid::uhid_write(fd, &answer);
-    break;
-  }
-
+  // RAW HID output report (this is what you want for rumble packets)
   case UHID_OUTPUT: {
     if (ev.u.output.size < 2) break;
+    const uint8_t* data = ev.u.output.data;
+    size_t size = ev.u.output.size;
 
-    // Report ID must match Ultimate2 output report ID (0x05)
-    if (ev.u.output.data[0] != uhid::ULTIMATE2_REPORT_ID_OUTPUT) break;
+    // Ultimate2 expects report id 0x05
+    if (data[0] != uhid::ULTIMATE2_REPORT_ID_OUTPUT) break;
 
-    if (state->on_rumble && ev.u.output.size >= 3) {
-      auto left  = static_cast<int>(ev.u.output.data[1] * 0xFFFF / 100.0f);
-      auto right = static_cast<int>(ev.u.output.data[2] * 0xFFFF / 100.0f);
+    if (state->on_rumble && size >= 3) {
+      auto left  = static_cast<int>(data[1] * 0xFFFF / 100.0f);
+      auto right = static_cast<int>(data[2] * 0xFFFF / 100.0f);
       (*state->on_rumble)(left, right);
     }
+    break;
+  }
+
+  // EVDEV-style output event (type/code/value) — not bytes on your kernel
+  case UHID_OUTPUT_EV: {
+    // Optional: log it for debugging
+    fprintf(stderr, "UHID_OUTPUT_EV type=%u code=%u value=%d\n",
+             ev.u.output_ev.type, ev.u.output_ev.code, ev.u.output_ev.value);
     break;
   }
 
@@ -69,6 +57,7 @@ static void on_uhid_event(std::shared_ptr<Ultimate2JoypadState> state, uhid_even
     break;
   }
 }
+
 
 
 
