@@ -88,7 +88,7 @@ Result<Ultimate2Joypad> Ultimate2Joypad::create(const DeviceDefinition &device) 
       .name = device.name,
       .phys = device.device_phys,
       .uniq = device.device_uniq,
-      .bus = BUS_USB,
+      .bus = BUS_BLUETOOTH,
       .vendor = static_cast<uint32_t>(device.vendor_id),
       .product = static_cast<uint32_t>(device.product_id),
       .version = static_cast<uint32_t>(device.version),
