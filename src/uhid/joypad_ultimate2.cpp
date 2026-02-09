@@ -73,7 +73,7 @@ Result<Ultimate2Joypad> Ultimate2Joypad::create(const DeviceDefinition &device) 
       .name = device.name,
       .phys = device.device_phys,
       .uniq = device.device_uniq,
-      .bus = BUS_BLUETOOTH,
+      .bus = BUS_USB,
       .vendor = static_cast<uint32_t>(device.vendor_id),
       .product = static_cast<uint32_t>(device.product_id),
       .version = static_cast<uint32_t>(device.version),
@@ -236,25 +236,34 @@ void Ultimate2Joypad::set_triggers(int16_t left, int16_t right) {
     this->_state->current_state.buttons[1] |= 0x02;
 
   send_report(*this->_state);
+}static inline uint8_t stick_u8_from_s16(int v) {
+  // v: -32768..32767
+  int32_t x = int32_t(v) + 32768;      // 0..65535
+  return uint8_t((x * 255) / 65535);   // floor -> 0 maps to 127 (0x7F)
 }
 
+
+
 void Ultimate2Joypad::set_stick(Joypad::STICK_POSITION stick_type, short x, short y) {
+  if (!_state) return;
+
+  const uint8_t xu = stick_u8_from_s16(x);
+  const uint8_t yu = stick_u8_from_s16(-y); // keep your existing inverted Y
+
   switch (stick_type) {
-  case RS: {
-    this->_state->current_state.z = scale_value(x, -32768, 32767, uhid::ULTIMATE2_AXIS_MIN, uhid::ULTIMATE2_AXIS_MAX);
-    this->_state->current_state.rz =
-        scale_value(-y, -32768, 32767, uhid::ULTIMATE2_AXIS_MIN, uhid::ULTIMATE2_AXIS_MAX);
-    break;
+    case LS:
+      _state->current_state.x = xu;
+      _state->current_state.y = yu;
+      break;
+    case RS:
+      _state->current_state.z  = xu;
+      _state->current_state.rz = yu;
+      break;
   }
-  case LS: {
-    this->_state->current_state.x = scale_value(x, -32768, 32767, uhid::ULTIMATE2_AXIS_MIN, uhid::ULTIMATE2_AXIS_MAX);
-    this->_state->current_state.y =
-        scale_value(-y, -32768, 32767, uhid::ULTIMATE2_AXIS_MIN, uhid::ULTIMATE2_AXIS_MAX);
-    break;
-  }
-  }
-  send_report(*this->_state);
+
+  send_report(*_state);
 }
+
 
 void Ultimate2Joypad::set_on_rumble(const std::function<void(int, int)> &callback) {
   this->_state->on_rumble = callback;
