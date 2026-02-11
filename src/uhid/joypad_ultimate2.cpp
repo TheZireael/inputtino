@@ -26,30 +26,71 @@ static void send_report(Ultimate2JoypadState &state) {
 
 static void on_uhid_event(std::shared_ptr<Ultimate2JoypadState> state, uhid_event ev, int fd) {
   (void)fd;
+  auto handle_rumble_report = [state](const uint8_t *data, size_t size) {
+    if (size < 2) return;
+
+    // Ultimate2 expects report id 0x05
+    if (data[0] != uhid::ULTIMATE2_REPORT_ID_OUTPUT) {
+      if (size >= 2 && data[1] == uhid::ULTIMATE2_REPORT_ID_OUTPUT) {
+        data = &data[1];
+        size -= 1;
+      } else {
+        return;
+      }
+    }
+
+    if (state->on_rumble && size >= 3) {
+      auto left = static_cast<int>(data[1] * 0xFFFF / 100.0f);
+      auto right = static_cast<int>(data[2] * 0xFFFF / 100.0f);
+      (*state->on_rumble)(left, right);
+    }
+  };
   switch (ev.type) {
 
   // RAW HID output report (this is what you want for rumble packets)
   case UHID_OUTPUT: {
     if (ev.u.output.size < 2) break;
-    const uint8_t* data = ev.u.output.data;
-    size_t size = ev.u.output.size;
+    handle_rumble_report(ev.u.output.data, ev.u.output.size);
+    break;
+  }
 
-    // Ultimate2 expects report id 0x05
-    if (data[0] != uhid::ULTIMATE2_REPORT_ID_OUTPUT) break;
-
-    if (state->on_rumble && size >= 3) {
-      auto left  = static_cast<int>(data[1] * 0xFFFF / 100.0f);
-      auto right = static_cast<int>(data[2] * 0xFFFF / 100.0f);
-      (*state->on_rumble)(left, right);
+  case UHID_SET_REPORT: {
+    // Some applications send output via SET_REPORT instead of OUTPUT
+    if (ev.u.set_report.size >= 2) {
+      handle_rumble_report(ev.u.set_report.data, ev.u.set_report.size);
     }
+
+    uhid_event answer{};
+    answer.type = UHID_SET_REPORT_REPLY;
+    answer.u.set_report_reply.id = ev.u.set_report.id;
+    answer.u.set_report_reply.err = 0;
+    uhid::uhid_write(fd, &answer);
+    break;
+  }
+
+  case UHID_GET_REPORT: {
+    uhid_event answer{};
+    answer.type = UHID_GET_REPORT_REPLY;
+    answer.u.get_report_reply.id = ev.u.get_report.id;
+    answer.u.get_report_reply.err = 0;
+
+    if (ev.u.get_report.rnum == uhid::ULTIMATE2_REPORT_ID_INPUT) {
+      answer.u.get_report_reply.data[0] = uhid::ULTIMATE2_REPORT_ID_INPUT;
+      std::memcpy(&answer.u.get_report_reply.data[1],
+                  &state->current_state,
+                  sizeof(state->current_state));
+      answer.u.get_report_reply.size = sizeof(state->current_state) + 1;
+    } else {
+      // Unknown report id; return empty success
+      answer.u.get_report_reply.size = 0;
+    }
+
+    uhid::uhid_write(fd, &answer);
     break;
   }
 
   // EVDEV-style output event (type/code/value) — not bytes on your kernel
   case UHID_OUTPUT_EV: {
-    // Optional: log it for debugging
-    fprintf(stderr, "UHID_OUTPUT_EV type=%u code=%u value=%d\n",
-             ev.u.output_ev.type, ev.u.output_ev.code, ev.u.output_ev.value);
     break;
   }
 
@@ -73,7 +114,6 @@ Ultimate2Joypad::Ultimate2Joypad(uint16_t vendor_id, uint16_t product_id, std::s
   _state->current_state.rz = uhid::ULTIMATE2_AXIS_NEUTRAL;
   _state->current_state.rt = 0;
   _state->current_state.lt = 0;
-  _state->current_state.vendor[3] = 100;
 }
 
 Ultimate2Joypad::~Ultimate2Joypad() {
@@ -88,7 +128,7 @@ Result<Ultimate2Joypad> Ultimate2Joypad::create(const DeviceDefinition &device) 
       .name = device.name,
       .phys = device.device_phys,
       .uniq = device.device_uniq,
-      .bus = BUS_BLUETOOTH,
+      .bus = BUS_USB,
       .vendor = static_cast<uint32_t>(device.vendor_id),
       .product = static_cast<uint32_t>(device.product_id),
       .version = static_cast<uint32_t>(device.version),
@@ -203,13 +243,13 @@ void Ultimate2Joypad::set_pressed_buttons(unsigned int pressed) {
   if (B & pressed)
     this->_state->current_state.buttons[0] |= 0x02;
   if (PADDLE1_FLAG & pressed)
-    this->_state->current_state.buttons[0] |= 0x04;
+    this->_state->current_state.buttons[2] |= 0x02;
   if (X & pressed)
     this->_state->current_state.buttons[0] |= 0x08;
   if (Y & pressed)
     this->_state->current_state.buttons[0] |= 0x10;
   if (PADDLE2_FLAG & pressed)
-    this->_state->current_state.buttons[0] |= 0x20;
+    this->_state->current_state.buttons[2] |= 0x01;
   if (LEFT_BUTTON & pressed)
     this->_state->current_state.buttons[0] |= 0x40;
   if (RIGHT_BUTTON & pressed)
@@ -227,9 +267,9 @@ void Ultimate2Joypad::set_pressed_buttons(unsigned int pressed) {
     this->_state->current_state.buttons[1] |= 0x40;
 
   if (PADDLE3_FLAG & pressed)
-    this->_state->current_state.buttons[2] |= 0x01;
+    this->_state->current_state.buttons[0] |= 0x04;
   if (PADDLE4_FLAG & pressed)
-    this->_state->current_state.buttons[2] |= 0x02;
+    this->_state->current_state.buttons[0] |= 0x20;
 
   send_report(*this->_state);
 }
@@ -251,7 +291,9 @@ void Ultimate2Joypad::set_triggers(int16_t left, int16_t right) {
     this->_state->current_state.buttons[1] |= 0x02;
 
   send_report(*this->_state);
-}static inline uint8_t stick_u8_from_s16(int v) {
+}
+
+static inline uint8_t stick_u8_from_s16(int v) {
   // v: -32768..32767
   int32_t x = int32_t(v) + 32768;      // 0..65535
   return uint8_t((x * 255) / 65535);   // floor -> 0 maps to 127 (0x7F)
@@ -284,11 +326,6 @@ void Ultimate2Joypad::set_on_rumble(const std::function<void(int, int)> &callbac
   this->_state->on_rumble = callback;
 }
 
-void Ultimate2Joypad::set_battery(uint8_t level) {
-  this->_state->current_state.vendor[3] = std::clamp<int>(level, 0, 100);
-  send_report(*this->_state);
-}
-
 static uint16_t to_le_signed(int value) {
   value = std::clamp(value, static_cast<int>(SHRT_MIN), static_cast<int>(SHRT_MAX));
   return htole16(value);
@@ -301,21 +338,27 @@ static inline int16_t clamp_i16(long v) {
 }
 
 void Ultimate2Joypad::set_motion(MOTION_TYPE type, float x, float y, float z) {
-  int16_t v[3];
+  uint16_t v[3];
 
   if (type == GYROSCOPE) {
     // x,y,z are deg/s from Moonlight
-    v[0] = clamp_i16(lroundf(x * 16.0f));
-    v[1] = clamp_i16(lroundf(y * 16.0f));
-    v[2] = clamp_i16(lroundf(z * 16.0f));
-    std::memcpy(&_state->current_state.vendor[4], v, sizeof(v));
+    // Axis remap to match real Ultimate2 gyro layout
+    // C3=-R4, C4=R5, C5=-R3
+    v[0] = to_le_signed(clamp_i16(lroundf((-z) * 16.0f)));
+    v[1] = to_le_signed(clamp_i16(lroundf((-x) * 16.0f)));
+    v[2] = to_le_signed(clamp_i16(lroundf((y) * 16.0f)));
+    // Wire positions 20..25 => vendor[10..15]
+    std::memcpy(&_state->current_state.vendor[10], v, sizeof(v));
   } else {
     // x,y,z are m/s^2 from Moonlight
     constexpr float g = 9.80665f;
-    v[0] = clamp_i16(lroundf((x / g) * 4096.0f));
-    v[1] = clamp_i16(lroundf((y / g) * 4096.0f));
-    v[2] = clamp_i16(lroundf((z / g) * 4096.0f));
-    std::memcpy(&_state->current_state.vendor[10], v, sizeof(v));
+    // Axis remap to match real Ultimate2 accel layout
+    // C0=-R1, C1=R2, C2=-R0
+    v[0] = to_le_signed(clamp_i16(lroundf(((-z) / g) * 4096.0f)));
+    v[1] = to_le_signed(clamp_i16(lroundf(((-x) / g) * 4096.0f)));
+    v[2] = to_le_signed(clamp_i16(lroundf(((y) / g) * 4096.0f)));
+    // Wire positions 14..19 => vendor[4..9]
+    std::memcpy(&_state->current_state.vendor[4], v, sizeof(v));
   }
 
   send_report(*_state);

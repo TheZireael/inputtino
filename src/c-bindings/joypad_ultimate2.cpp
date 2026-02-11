@@ -63,12 +63,6 @@ void inputtino_joypad_ultimate2_set_motion(
   }
 }
 
-void inputtino_joypad_ultimate2_set_battery(InputtinoUltimate2Joypad *joypad, unsigned short level) {
-  if (joypad) {
-    reinterpret_cast<inputtino::Ultimate2Joypad *>(joypad)->set_battery(level);
-  }
-}
-
 void inputtino_joypad_ultimate2_destroy(InputtinoUltimate2Joypad *joypad) {
   if (joypad) {
     auto joypad_ptr = reinterpret_cast<inputtino::Ultimate2Joypad *>(joypad);

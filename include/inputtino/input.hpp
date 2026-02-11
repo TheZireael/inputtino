@@ -467,10 +467,10 @@ private:
 class Ultimate2Joypad : public Joypad {
 public:
   static Result<Ultimate2Joypad>
-  create(const DeviceDefinition &device = {.name = "8BitDo Ultimate 2 (virtual) pad",
+  create(const DeviceDefinition &device = {.name = "8BitDo Ultimate 2 Wireless Controller for PC",
                                            .vendor_id = 0x2DC8,
                                            .product_id = 0x6012,
-                                           .version = 0x0100});
+                                           .version = 0x0111});
   Ultimate2Joypad(Ultimate2Joypad &&j) noexcept : _state(nullptr) {
     std::swap(j._state, _state);
   }
@@ -490,7 +490,6 @@ public:
   };
 
   void set_motion(MOTION_TYPE type, float x, float y, float z);
-  void set_battery(uint8_t level);
 
 protected:
   typedef struct Ultimate2JoypadState Ultimate2JoypadState;

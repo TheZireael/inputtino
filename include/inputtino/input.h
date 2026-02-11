@@ -349,8 +349,6 @@ inputtino_joypad_ultimate2_set_motion(InputtinoUltimate2Joypad *joypad,
                                       float y,
                                       float z);
 
-LIBINPUTTINO_EXPORT void inputtino_joypad_ultimate2_set_battery(InputtinoUltimate2Joypad *joypad, unsigned short level);
-
 LIBINPUTTINO_EXPORT void inputtino_joypad_ultimate2_destroy(InputtinoUltimate2Joypad *joypad);
 
 #ifdef __cplusplus
